@@ -1,3 +1,5 @@
 generated*.ld
 *.o
 .*.sw?
+binary.*
+*.d

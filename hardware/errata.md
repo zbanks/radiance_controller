@@ -4,3 +4,4 @@ v1 errata
 - Use larger pads for through-hole components
 - Connect EN to VIN on MIC5504
     - Consider replacing with NCP114
+- DFU boot button doesn't seem to work

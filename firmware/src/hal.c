@@ -12,10 +12,10 @@
 
 #define RISETIME 0
 #define PULSE_PERIOD 60
-#define PULSE_WIDTH_0 (17 + RISETIME)
-#define PULSE_WIDTH_1 (34 + RISETIME)
+#define PULSE_WIDTH_0 (17 + 1)
+#define PULSE_WIDTH_1 (34 + 1)
 #define RESET_PERIODS 50
-#define PULSE_BUFFER_LENGTH (24  + RESET_PERIODS * 2)
+#define PULSE_BUFFER_LENGTH (24  + RESET_PERIODS)
 static uint8_t pulse_buffer[PULSE_BUFFER_LENGTH];
 
 void hal_init() {
@@ -95,16 +95,14 @@ void hal_init() {
 	usart_enable(USART1);
 
     // Configure WS2812 LED
-    gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ, GPIO1);
-    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO1);
+    gpio_set_output_options(GPIOA, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ, GPIO1);
+    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
     gpio_set_af(GPIOA, GPIO_AF2, GPIO1);
 
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
     timer_disable_break(TIM2);
     timer_set_period(TIM2, PULSE_PERIOD);
     timer_enable_break_main_output(TIM2);
-#define TIM_DCR_DBA_CCR2 14
-    TIM_DCR(TIM2) = TIM_DCR_DBA_CCR2;
     timer_set_dma_on_update_event(TIM2);
     timer_enable_irq(TIM2, TIM_DIER_CC2DE);
 
@@ -230,7 +228,6 @@ void hal_set_led(uint32_t rgb) {
     if (DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN) return;
 
     static_assert(PULSE_BUFFER_LENGTH == sizeof(pulse_buffer), "pb");
-    //static_assert(PULSE_BUFFER_LENGTH > 24 + 20, "pb");
     for (uint16_t i = 0; i < PULSE_BUFFER_LENGTH; i++) {
         if (i < RESET_PERIODS)
             pulse_buffer[i] = 0;
@@ -238,7 +235,6 @@ void hal_set_led(uint32_t rgb) {
             pulse_buffer[i] = (rgb & ((uint32_t)1 << (23 - (i - RESET_PERIODS)))) ? PULSE_WIDTH_1 : PULSE_WIDTH_0;
         else 
             pulse_buffer[i] = 0;
-        (void) rgb;
     }
     TIM_CCR2(TIM2) = 0;
 

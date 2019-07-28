@@ -10,12 +10,12 @@
 #include <libopencm3/stm32/dma.h>
 #include <libopencm3/stm32/usart.h>
 
-#define RISETIME 4
-#define PULSE_PERIOD 58
-#define PULSE_WIDTH_0 ((PULSE_PERIOD / 4) + RISETIME)
-#define PULSE_WIDTH_1 ((PULSE_PERIOD / 2) + RISETIME)
+#define RISETIME 0
+#define PULSE_PERIOD 60
+#define PULSE_WIDTH_0 (17 + RISETIME)
+#define PULSE_WIDTH_1 (34 + RISETIME)
 #define RESET_PERIODS 50
-#define PULSE_BUFFER_LENGTH (24 * 2 + RESET_PERIODS)
+#define PULSE_BUFFER_LENGTH (24  + RESET_PERIODS * 2)
 static uint8_t pulse_buffer[PULSE_BUFFER_LENGTH];
 
 void hal_init() {
@@ -99,21 +99,14 @@ void hal_init() {
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO1);
     gpio_set_af(GPIOA, GPIO_AF2, GPIO1);
 
-    //timer_set_prescaler(TIM2, 0);
-    //timer_direction_up(TIM2);
-    //timer_set_clock_division(TIM2, 0);
-
-    //timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
     timer_disable_break(TIM2);
     timer_set_period(TIM2, PULSE_PERIOD);
     timer_enable_break_main_output(TIM2);
-    //TIM_DCR(TIM2) = TIM_DCR_DBL_4_TRANSFERS | TIM_DCR_DBA_CCR2;
-#define TIM_DCR_DBA_CCR1 13
 #define TIM_DCR_DBA_CCR2 14
     TIM_DCR(TIM2) = TIM_DCR_DBA_CCR2;
     timer_set_dma_on_update_event(TIM2);
-    timer_enable_irq(TIM2, TIM_DIER_CC2DE); ///TIM_DIER_CC2DE TIM_DIER_UDR TIM_DIER_UDE
+    timer_enable_irq(TIM2, TIM_DIER_CC2DE);
 
     timer_set_oc_mode(TIM2, TIM_OC2, TIM_OCM_PWM2);
     timer_set_oc_polarity_low(TIM2, TIM_OC2);
@@ -125,7 +118,6 @@ void hal_init() {
     timer_enable_counter(TIM2);
 
     dma_channel_reset(DMA1, DMA_CHANNEL3);
-    //dma_set_peripheral_address(DMA1, DMA_CHANNEL3, (uint32_t)&(TIM_DMAR(TIM2)));
     dma_set_peripheral_address(DMA1, DMA_CHANNEL3, (uint32_t)&TIM_CCR2(TIM2));
     dma_set_memory_address(DMA1, DMA_CHANNEL3, (uint32_t)&pulse_buffer);
     dma_set_read_from_memory(DMA1, DMA_CHANNEL3);
@@ -234,17 +226,8 @@ uint16_t hal_rx() {
 
 static volatile bool dma_en = 0;
 
-static volatile uint32_t t = 0;
-static volatile uint32_t c = 0;
-
 void hal_set_led(uint32_t rgb) {
-    t = TIM_CCR2(TIM2);
-    //TIM_CCR2(TIM2) = PULSE_PERIOD / 2;
-    //dma_en = DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN;
     if (DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN) return;
-    //static uint32_t i = 0;
-    //if (i++ != 0) return;
-    //i = -1000;
 
     static_assert(PULSE_BUFFER_LENGTH == sizeof(pulse_buffer), "pb");
     //static_assert(PULSE_BUFFER_LENGTH > 24 + 20, "pb");
@@ -252,32 +235,21 @@ void hal_set_led(uint32_t rgb) {
         if (i < RESET_PERIODS)
             pulse_buffer[i] = 0;
         else if (i < RESET_PERIODS + 24) 
-            //pulse_buffer[i] = PULSE_WIDTH_1;
-            pulse_buffer[i] = (rgb & ((uint32_t)1 << (i - RESET_PERIODS))) ? PULSE_WIDTH_1 : PULSE_WIDTH_0;
+            pulse_buffer[i] = (rgb & ((uint32_t)1 << (23 - (i - RESET_PERIODS)))) ? PULSE_WIDTH_1 : PULSE_WIDTH_0;
         else 
-            pulse_buffer[i] = PULSE_WIDTH_0;
+            pulse_buffer[i] = 0;
         (void) rgb;
     }
     TIM_CCR2(TIM2) = 0;
 
-    //TIM_DCR(TIM2) = TIM_DCR_DBL_4_TRANSFERS | TIM_DCR_DBA_CCR2;
-    TIM_DCR(TIM2) = TIM_DCR_DBA_CCR2;
     dma_set_number_of_data(DMA1, DMA_CHANNEL3, PULSE_BUFFER_LENGTH);
-    dma_set_memory_address(DMA1, DMA_CHANNEL3, (uint32_t)&pulse_buffer[0]);
 
     dma_clear_interrupt_flags(DMA1, DMA_CHANNEL3, DMA_TCIF);
     dma_enable_channel(DMA1, DMA_CHANNEL3);
     TIM_EGR(TIM2) = TIM_EGR_UG;
-
-    //while (!(DMA1_ISR & DMA_ISR_TCIF3));
 }
 
-static volatile uint32_t hit_dma = 0;
 void __attribute__((used)) dma1_channel2_3_dma2_channel1_2_isr() {
-    //if (DMA1_ISR & DMA_ISR_TCIF3) {
-    //    DMA1_IFCR = DMA_ISR_TCIF3;
-    //}
-    hit_dma++;
     dma_disable_channel(DMA1, DMA_CHANNEL3);
     if (DMA1_ISR & DMA_ISR_TCIF3) {
         DMA1_IFCR = DMA_ISR_TCIF3;

@@ -51,7 +51,8 @@ int main(void) {
 
     while (1) {
         uint32_t x = (hal_pot() >> 8);
-        hal_set_led((x | (x << 8) | (x << 16)));
+        //hal_set_led((x | (x << 8) | (x << 16)));
+        hal_set_led(x);
         hal_poll();
         usb_poll();
         if (hal_tx_ready()) {

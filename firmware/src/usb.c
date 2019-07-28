@@ -1,12 +1,14 @@
 #include "usb.h"
 
-#include <libopencm3/stm32/rcc.h>
-#include <libopencm3/stm32/gpio.h>
-#include <libopencm3/stm32/syscfg.h>
 #include <libopencm3/stm32/crs.h>
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/rcc.h>
+#include <libopencm3/stm32/syscfg.h>
 #include <libopencm3/usb/usbd.h>
 
 static uint8_t usbd_data_buffer[128];
+static const void *usb_response = NULL;
+static uint16_t usb_response_length = 0;
 
 static const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -39,7 +41,7 @@ static const struct usb_endpoint_descriptor endps[] = {
         .bDescriptorType = USB_DT_ENDPOINT,
         .bEndpointAddress = 0x82,
         .bmAttributes = USB_ENDPOINT_ATTR_BULK,
-        .wMaxPacketSize = sizeof usbd_data_buffer,
+        .wMaxPacketSize = 512,
         .bInterval = 0,
     },
 };
@@ -79,7 +81,7 @@ static const struct usb_config_descriptor config = {
 static const char *usb_strings[] = {
 	"Radiance Labs",
 	"Radiace Controller V1",
-	"1",
+	"1234",
 };
 
 static uint8_t usbd_control_buffer[128];
@@ -103,21 +105,16 @@ static void usb_data_rx(usbd_device *usbd_dev, uint8_t endpoint) {
     int len = usbd_ep_read_packet(usbd_dev, 0x01, usbd_data_buffer, sizeof usbd_data_buffer);
     if (len < 0) {
         return;
-    } else if (len > sizeof usbd_data_buffer) {
-        len = sizeof usbd_data_buffer;
     }
 
-    for (int i = 0; i < len; i++) {
-        usbd_data_buffer[i] ^= 0x5;
-    }
-    usbd_ep_write_packet(usbd_dev, 0x82, usbd_data_buffer, len);
+    usbd_ep_write_packet(usbd_dev, 0x82, usb_response, usb_response_length);
 }
 
 static void usb_set_config_cb(usbd_device *usbd_dev, uint16_t wValue) {
 	(void)wValue;
 
     usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, sizeof usbd_data_buffer, usb_data_rx);
-    usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_BULK, sizeof usbd_data_buffer, NULL);
+    usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_BULK, sizeof usb_response, NULL);
 
 	usbd_register_control_callback(
 				usbd_dev,
@@ -141,4 +138,9 @@ void usb_init() {
 
 void usb_poll() {
     usbd_poll(usbd_dev);
+}
+
+void usb_set_response(const void * data, uint16_t length) {
+    usb_response = data;
+    usb_response_length = length;
 }

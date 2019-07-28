@@ -3,6 +3,7 @@ OPENCM3_DIR     = libopencm3
 OBJS            += $(patsubst %.c,%.o,$(wildcard src/*.c))
 
 CFLAGS          += -O0 -ggdb3 -std=c11
+CFLAGS          += -Werror -Wall -Wextra
 CPPFLAGS		+= -MD
 LDFLAGS         += -static -nostartfiles
 LDLIBS          += -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
@@ -28,6 +29,8 @@ load: binary.elf
 	$(DB) $< -x init.gdb -ex load
 loadquit: binary.elf
 	$(DB) $< -batch -x init.gdb -ex load -ex kill -ex quit
+loadquitpwr: binary.elf
+	$(DB) $< -batch -x init.gdb -ex 'mon tpwr en' -ex load -ex kill -ex quit
 stlink:
 	st-util -p 4244
 stload: binary.bin

@@ -2,8 +2,8 @@ DEVICE			= stm32f042g4u6
 OPENCM3_DIR     = libopencm3
 OBJS            += $(patsubst %.c,%.o,$(wildcard src/*.c))
 
-CFLAGS          += -O0 -ggdb3 -std=c11
-CFLAGS          += -Werror -Wall -Wextra
+CFLAGS          += -Os -ggdb3 -std=c11
+CFLAGS          += -Werror -Wall -Wextra -Wshadow
 CPPFLAGS		+= -MD
 LDFLAGS         += -static -nostartfiles
 LDLIBS          += -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group

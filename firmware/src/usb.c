@@ -1,5 +1,7 @@
 #include "usb.h"
+#include "comm.h"
 
+#include <libopencmsis/core_cm3.h>
 #include <libopencm3/stm32/crs.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
@@ -7,8 +9,8 @@
 #include <libopencm3/usb/usbd.h>
 
 static uint8_t usbd_data_buffer[128];
-static const void *usb_response = NULL;
-static uint16_t usb_response_length = 0;
+static struct frame usb_response;
+//static uint16_t usb_response_length = 0;
 
 static const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -106,8 +108,12 @@ static void usb_data_rx(usbd_device *usbd_dev, uint8_t endpoint) {
     if (len < 0) {
         return;
     }
+    if (len == FS) {
+        comm_usb((void *)usbd_data_buffer);
+        memcpy(&usb_response, usbd_data_buffer, sizeof usb_response);
+    }
 
-    usbd_ep_write_packet(usbd_dev, 0x82, usb_response, usb_response_length);
+    usbd_ep_write_packet(usbd_dev, 0x82, &usb_response, sizeof usb_response);
 }
 
 static void usb_set_config_cb(usbd_device *usbd_dev, uint16_t wValue) {
@@ -134,13 +140,14 @@ void usb_init() {
 
 	usbd_dev = usbd_init(&st_usbfs_v2_usb_driver, &dev, &config, usb_strings, 3, usbd_control_buffer, sizeof(usbd_control_buffer));
 	usbd_register_set_config_callback(usbd_dev, usb_set_config_cb);
+    nvic_set_priority(NVIC_USB_IRQ, 1 << 4);
+    nvic_enable_irq(NVIC_USB_IRQ);
 }
 
 void usb_poll() {
     usbd_poll(usbd_dev);
 }
 
-void usb_set_response(const void * data, uint16_t length) {
-    usb_response = data;
-    usb_response_length = length;
+void __attribute__((used)) usb_isr() {
+    usb_poll();
 }
